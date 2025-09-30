@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Brain, Heart, Moon, Music, Palette, Gamepad2, BookOpen, 
-  Target, Users, Shield, Video, Star, Plus, Edit, Trash2,
-  Save, X, Upload, Play, Volume2, Eye, Settings, Search,
-  Clock, Award, CheckCircle, AlertTriangle
+  Plus, Search, Filter, Edit, Trash2, Eye, Save, X,
+  BookOpen, Brain, Heart, Music, Palette, Gamepad2,
+  Target, Users, Clock, Star, Play, Moon, Zap,
+  Shield, Award, Camera, Video, Headphones, Leaf,
+  Sun, Wind, Waves, Coffee, Smile, Activity, Settings
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -14,1607 +15,1146 @@ interface TherapyModule {
   id: string;
   title: string;
   description: string;
-  category: string;
   icon: string;
   color: string;
   duration: string;
   difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
-  techniques: number;
-  progress: number;
-  streak: number;
-  active: boolean;
-  subTechniques: SubTechnique[];
-}
-
-interface SubTechnique {
-  id: string;
-  title: string;
-  description: string;
-  type: 'form' | 'exercise' | 'guide' | 'tracker';
-  fields?: FormField[];
-  steps?: string[];
-  instructions?: string[];
-}
-
-interface FormField {
-  id: string;
-  label: string;
-  type: 'text' | 'textarea' | 'select' | 'range' | 'checkbox' | 'radio';
-  options?: string[];
-  required: boolean;
-}
-
-interface AudioFile {
-  id: string;
-  title: string;
-  artist: string;
-  duration: string;
+  sessions: number;
   category: string;
-  description: string;
-  thumbnail: string;
-  audioUrl: string;
-  active: boolean;
+  tags: string[];
+  status: 'active' | 'inactive';
+  route: string;
+  moduleId: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
-interface VideoFile {
-  id: string;
-  title: string;
-  therapist: string;
-  duration: string;
-  category: string;
-  description: string;
-  thumbnail: string;
-  videoUrl: string;
-  difficulty: string;
-  active: boolean;
-}
+const ICON_OPTIONS = [
+  { value: 'BookOpen', label: 'Book', component: BookOpen },
+  { value: 'Brain', label: 'Brain', component: Brain },
+  { value: 'Heart', label: 'Heart', component: Heart },
+  { value: 'Music', label: 'Music', component: Music },
+  { value: 'Palette', label: 'Palette', component: Palette },
+  { value: 'Gamepad2', label: 'Game Controller', component: Gamepad2 },
+  { value: 'Target', label: 'Target', component: Target },
+  { value: 'Users', label: 'Users', component: Users },
+  { value: 'Clock', label: 'Clock', component: Clock },
+  { value: 'Star', label: 'Star', component: Star },
+  { value: 'Play', label: 'Play', component: Play },
+  { value: 'Moon', label: 'Moon', component: Moon },
+  { value: 'Zap', label: 'Lightning', component: Zap },
+  { value: 'Shield', label: 'Shield', component: Shield },
+  { value: 'Award', label: 'Award', component: Award },
+  { value: 'Camera', label: 'Camera', component: Camera },
+  { value: 'Video', label: 'Video', component: Video },
+  { value: 'Headphones', label: 'Headphones', component: Headphones },
+  { value: 'Leaf', label: 'Leaf', component: Leaf },
+  { value: 'Sun', label: 'Sun', component: Sun },
+  { value: 'Wind', label: 'Wind', component: Wind },
+  { value: 'Waves', label: 'Waves', component: Waves },
+  { value: 'Coffee', label: 'Coffee', component: Coffee },
+  { value: 'Smile', label: 'Smile', component: Smile },
+  { value: 'Activity', label: 'Activity', component: Activity }
+];
+
+const COLOR_OPTIONS = [
+  { value: 'from-purple-500 to-pink-500', label: 'Purple to Pink' },
+  { value: 'from-blue-500 to-cyan-500', label: 'Blue to Cyan' },
+  { value: 'from-teal-500 to-green-500', label: 'Teal to Green' },
+  { value: 'from-green-500 to-teal-500', label: 'Green to Teal' },
+  { value: 'from-purple-500 to-blue-500', label: 'Purple to Blue' },
+  { value: 'from-cyan-500 to-blue-500', label: 'Cyan to Blue' },
+  { value: 'from-pink-500 to-purple-500', label: 'Pink to Purple' },
+  { value: 'from-orange-500 to-red-500', label: 'Orange to Red' },
+  { value: 'from-blue-500 to-indigo-500', label: 'Blue to Indigo' },
+  { value: 'from-teal-500 to-cyan-500', label: 'Teal to Cyan' },
+  { value: 'from-yellow-500 to-orange-500', label: 'Yellow to Orange' },
+  { value: 'from-indigo-500 to-purple-500', label: 'Indigo to Purple' }
+];
+
+const CATEGORY_OPTIONS = [
+  'Cognitive Therapy',
+  'Mindfulness',
+  'Stress Management',
+  'Positive Psychology',
+  'Relaxation',
+  'Gamified Therapy',
+  'Creative Therapy',
+  'Behavioral Therapy',
+  'Educational',
+  'Acceptance Therapy',
+  'Monitoring',
+  'Wellness'
+];
+
+const TAG_OPTIONS = [
+  'anxiety', 'depression', 'stress', 'mindfulness', 'relaxation',
+  'cognitive', 'behavioral', 'creative', 'gamified', 'educational',
+  'breathing', 'meditation', 'journaling', 'music', 'art',
+  'exposure', 'acceptance', 'gratitude', 'sleep', 'mood'
+];
 
 function AdminTherapyManagement() {
   const { user } = useAuth();
   const { theme } = useTheme();
-  const [selectedTab, setSelectedTab] = useState<'modules' | 'audio' | 'video'>('modules');
+  const [therapyModules, setTherapyModules] = useState<TherapyModule[]>([]);
+  const [filteredModules, setFilteredModules] = useState<TherapyModule[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editingItem, setEditingItem] = useState<any>(null);
-  const [editingType, setEditingType] = useState<'module' | 'audio' | 'video'>('module');
-
-  // Default therapy modules data
-  const [therapyModules, setTherapyModules] = useState<TherapyModule[]>([
-    {
-      id: '1',
-      title: 'CBT Journaling',
-      description: 'Cognitive Behavioral Therapy techniques to identify and change negative thought patterns',
-      category: 'CBT',
-      icon: 'BookOpen',
-      color: 'from-purple-500 to-pink-500',
-      duration: '15-30 min',
-      difficulty: 'Beginner',
-      techniques: 3,
-      progress: 0,
-      streak: 0,
-      active: true,
-      subTechniques: [
-        {
-          id: 't1',
-          title: 'Thought Record',
-          description: 'Track and challenge negative thoughts',
-          type: 'form',
-          fields: [
-            { id: 'f1', label: 'Situation', type: 'textarea', required: true },
-            { id: 'f2', label: 'Automatic Thought', type: 'textarea', required: true },
-            { id: 'f3', label: 'Emotion', type: 'select', options: ['Anxious', 'Sad', 'Angry', 'Worried'], required: true },
-            { id: 'f4', label: 'Intensity', type: 'range', required: true }
-          ]
-        }
-      ]
-    },
-    {
-      id: '2',
-      title: 'Guided Meditation',
-      description: 'Mindfulness and meditation sessions for stress relief and emotional balance',
-      category: 'Meditation',
-      icon: 'Brain',
-      color: 'from-blue-500 to-cyan-500',
-      duration: '10-25 min',
-      difficulty: 'Beginner',
-      techniques: 6,
-      progress: 0,
-      streak: 0,
-      active: true,
-      subTechniques: [
-        {
-          id: 't2',
-          title: 'Breathing Exercise',
-          description: 'Guided breathing for relaxation',
-          type: 'exercise',
-          steps: ['Find comfortable position', 'Breathe in for 4 counts', 'Hold for 4 counts', 'Exhale for 6 counts']
-        }
-      ]
-    },
-    {
-      id: '3',
-      title: 'Stress Management',
-      description: 'Learn effective coping strategies for managing daily stress and pressure',
-      category: 'Stress',
-      icon: 'Target',
-      color: 'from-orange-500 to-red-500',
-      duration: '10-20 min',
-      difficulty: 'Intermediate',
-      techniques: 3,
-      progress: 0,
-      streak: 0,
-      active: true,
-      subTechniques: []
-    },
-    {
-      id: '4',
-      title: 'Sleep Therapy',
-      description: 'Improve sleep quality with proven techniques and sleep hygiene practices',
-      category: 'Sleep',
-      icon: 'Moon',
-      color: 'from-indigo-500 to-purple-500',
-      duration: '20-30 min',
-      difficulty: 'Beginner',
-      techniques: 4,
-      progress: 0,
-      streak: 0,
-      active: true,
-      subTechniques: []
-    },
-    {
-      id: '5',
-      title: 'Gratitude Journal',
-      description: 'Daily gratitude practices to cultivate positivity and appreciation',
-      category: 'Positive Psychology',
-      icon: 'Heart',
-      color: 'from-pink-500 to-rose-500',
-      duration: '5-15 min',
-      difficulty: 'Beginner',
-      techniques: 3,
-      progress: 0,
-      streak: 0,
-      active: true,
-      subTechniques: []
-    },
-    {
-      id: '6',
-      title: 'Addiction Support',
-      description: 'Evidence-based strategies for overcoming addiction and maintaining sobriety',
-      category: 'Addiction',
-      icon: 'Shield',
-      color: 'from-red-500 to-pink-500',
-      duration: '20-40 min',
-      difficulty: 'Advanced',
-      techniques: 5,
-      progress: 0,
-      streak: 0,
-      active: true,
-      subTechniques: []
-    },
-    {
-      id: '7',
-      title: 'Relaxation Music',
-      description: 'Curated audio library for relaxation, focus, and better sleep',
-      category: 'Music Therapy',
-      icon: 'Music',
-      color: 'from-green-500 to-teal-500',
-      duration: 'Variable',
-      difficulty: 'Beginner',
-      techniques: 4,
-      progress: 0,
-      streak: 0,
-      active: true,
-      subTechniques: []
-    },
-    {
-      id: '8',
-      title: 'Tetris Therapy',
-      description: 'Gamified stress relief and cognitive enhancement through mindful puzzle-solving',
-      category: 'Game Therapy',
-      icon: 'Gamepad2',
-      color: 'from-cyan-500 to-blue-500',
-      duration: '10-20 min',
-      difficulty: 'Beginner',
-      techniques: 2,
-      progress: 0,
-      streak: 0,
-      active: true,
-      subTechniques: []
-    },
-    {
-      id: '9',
-      title: 'Art & Color Therapy',
-      description: 'Creative expression through digital art and therapeutic coloring',
-      category: 'Art Therapy',
-      icon: 'Palette',
-      color: 'from-pink-500 to-purple-500',
-      duration: '15-45 min',
-      difficulty: 'Beginner',
-      techniques: 3,
-      progress: 0,
-      streak: 0,
-      active: true,
-      subTechniques: []
-    },
-    {
-      id: '10',
-      title: 'Exposure Therapy',
-      description: 'Gradual exposure techniques for anxiety and phobias with safety protocols',
-      category: 'Exposure',
-      icon: 'Eye',
-      color: 'from-yellow-500 to-orange-500',
-      duration: '20-60 min',
-      difficulty: 'Advanced',
-      techniques: 4,
-      progress: 0,
-      streak: 0,
-      active: true,
-      subTechniques: []
-    },
-    {
-      id: '11',
-      title: 'Video Therapy',
-      description: 'Professional therapeutic video content with licensed therapists',
-      category: 'Video Therapy',
-      icon: 'Video',
-      color: 'from-blue-500 to-indigo-500',
-      duration: '15-45 min',
-      difficulty: 'Intermediate',
-      techniques: 6,
-      progress: 0,
-      streak: 0,
-      active: true,
-      subTechniques: []
-    },
-    {
-      id: '12',
-      title: 'Acceptance & Commitment Therapy',
-      description: 'ACT principles for psychological flexibility and values-based living',
-      category: 'ACT',
-      icon: 'Star',
-      color: 'from-teal-500 to-cyan-500',
-      duration: '20-35 min',
-      difficulty: 'Intermediate',
-      techniques: 6,
-      progress: 0,
-      streak: 0,
-      active: true,
-      subTechniques: []
-    }
-  ]);
-
-  const [audioFiles, setAudioFiles] = useState<AudioFile[]>([
-    {
-      id: '1',
-      title: 'Deep Sleep Waves',
-      artist: 'Sleep Institute',
-      duration: '45 min',
-      category: 'nature',
-      description: 'Gentle ocean waves for deep relaxation and sleep',
-      thumbnail: 'https://images.pexels.com/photos/1001682/pexels-photo-1001682.jpeg?auto=compress&cs=tinysrgb&w=300',
-      audioUrl: '/audio/deep-sleep-waves.mp3',
-      active: true
-    },
-    {
-      id: '2',
-      title: 'Rain on Forest',
-      artist: 'Nature Sounds',
-      duration: '60 min',
-      category: 'nature',
-      description: 'Peaceful rainfall sounds in a quiet forest setting',
-      thumbnail: 'https://images.pexels.com/photos/1029604/pexels-photo-1029604.jpeg?auto=compress&cs=tinysrgb&w=300',
-      audioUrl: '/audio/rain-forest.mp3',
-      active: true
-    }
-  ]);
-
-  const [videoFiles, setVideoFiles] = useState<VideoFile[]>([
-    {
-      id: '1',
-      title: 'Understanding Anxiety',
-      therapist: 'Dr. Sarah Johnson',
-      duration: '20 min',
-      category: 'Anxiety',
-      description: 'Learn about anxiety, its causes, and coping strategies',
-      thumbnail: 'https://images.pexels.com/photos/5327580/pexels-photo-5327580.jpeg?auto=compress&cs=tinysrgb&w=300',
-      videoUrl: '/videos/anxiety-intro.mp4',
-      difficulty: 'Beginner',
-      active: true
-    }
-  ]);
-
-  const [newModule, setNewModule] = useState<Partial<TherapyModule>>({
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [showModal, setShowModal] = useState(false);
+  const [editingModule, setEditingModule] = useState<TherapyModule | null>(null);
+  const [formData, setFormData] = useState<Partial<TherapyModule>>({
     title: '',
     description: '',
-    category: '',
     icon: 'Brain',
-    color: 'from-purple-500 to-blue-500',
-    duration: '',
+    color: 'from-purple-500 to-pink-500',
+    duration: '15-20 min',
     difficulty: 'Beginner',
-    techniques: 0,
-    active: true,
-    subTechniques: []
+    sessions: 12,
+    category: 'Cognitive Therapy',
+    tags: [],
+    status: 'active'
   });
 
-  const [newAudio, setNewAudio] = useState<Partial<AudioFile>>({
-    title: '',
-    artist: '',
-    duration: '',
-    category: 'nature',
-    description: '',
-    thumbnail: '',
-    audioUrl: '',
-    active: true
-  });
+  useEffect(() => {
+    loadTherapyModules();
+  }, []);
 
-  const [newVideo, setNewVideo] = useState<Partial<VideoFile>>({
-    title: '',
-    therapist: '',
-    duration: '',
-    category: 'Anxiety',
-    description: '',
-    thumbnail: '',
-    videoUrl: '',
-    difficulty: 'Beginner',
-    active: true
-  });
+  useEffect(() => {
+    filterModules();
+  }, [therapyModules, searchTerm, statusFilter]);
 
-  const iconOptions = [
-    { value: 'Brain', label: 'Brain', component: Brain },
-    { value: 'Heart', label: 'Heart', component: Heart },
-    { value: 'Moon', label: 'Moon', component: Moon },
-    { value: 'Music', label: 'Music', component: Music },
-    { value: 'Palette', label: 'Palette', component: Palette },
-    { value: 'Gamepad2', label: 'Game', component: Gamepad2 },
-    { value: 'BookOpen', label: 'Book', component: BookOpen },
-    { value: 'Target', label: 'Target', component: Target },
-    { value: 'Users', label: 'Users', component: Users },
-    { value: 'Shield', label: 'Shield', component: Shield },
-    { value: 'Video', label: 'Video', component: Video },
-    { value: 'Star', label: 'Star', component: Star },
-    { value: 'Eye', label: 'Eye', component: Eye }
-  ];
+  const loadTherapyModules = () => {
+    // Load existing therapy modules from the TherapyModules page structure
+    const defaultModules: TherapyModule[] = [
+      {
+        id: '1',
+        title: 'CBT Thought Records',
+        description: 'Cognitive Behavioral Therapy techniques with guided prompts',
+        icon: 'BookOpen',
+        color: 'from-purple-500 to-pink-500',
+        duration: '15-20 min',
+        difficulty: 'Beginner',
+        sessions: 12,
+        category: 'Cognitive Therapy',
+        tags: ['cognitive', 'journaling', 'anxiety', 'depression'],
+        status: 'active',
+        route: '/therapy-modules/cbt',
+        moduleId: 'cbt',
+        createdAt: '2024-01-01',
+        updatedAt: '2024-01-01'
+      },
+      {
+        id: '2',
+        title: 'Mindfulness & Breathing',
+        description: 'Mindfulness and relaxation exercises with audio guidance',
+        icon: 'Brain',
+        color: 'from-blue-500 to-cyan-500',
+        duration: '10-30 min',
+        difficulty: 'Beginner',
+        sessions: 15,
+        category: 'Mindfulness',
+        tags: ['mindfulness', 'breathing', 'meditation', 'relaxation'],
+        status: 'active',
+        route: '/therapy-modules/mindfulness',
+        moduleId: 'mindfulness',
+        createdAt: '2024-01-01',
+        updatedAt: '2024-01-01'
+      },
+      {
+        id: '3',
+        title: 'Stress Management',
+        description: 'Learn effective coping strategies for daily stress',
+        icon: 'Target',
+        color: 'from-teal-500 to-green-500',
+        duration: '15-20 min',
+        difficulty: 'Beginner',
+        sessions: 8,
+        category: 'Stress Management',
+        tags: ['stress', 'coping', 'relaxation'],
+        status: 'active',
+        route: '/therapy-modules/stress',
+        moduleId: 'stress',
+        createdAt: '2024-01-01',
+        updatedAt: '2024-01-01'
+      },
+      {
+        id: '4',
+        title: 'Gratitude Journal',
+        description: 'Daily gratitude practice with streak tracking',
+        icon: 'Heart',
+        color: 'from-green-500 to-teal-500',
+        duration: '5-10 min',
+        difficulty: 'Beginner',
+        sessions: 21,
+        category: 'Positive Psychology',
+        tags: ['gratitude', 'journaling', 'positive'],
+        status: 'active',
+        route: '/therapy-modules/gratitude',
+        moduleId: 'gratitude',
+        createdAt: '2024-01-01',
+        updatedAt: '2024-01-01'
+      },
+      {
+        id: '5',
+        title: 'Relaxation Music',
+        description: 'Curated audio library for relaxation and focus',
+        icon: 'Music',
+        color: 'from-purple-500 to-blue-500',
+        duration: 'Variable',
+        difficulty: 'Beginner',
+        sessions: 20,
+        category: 'Relaxation',
+        tags: ['music', 'relaxation', 'audio'],
+        status: 'active',
+        route: '/therapy-modules/music',
+        moduleId: 'music',
+        createdAt: '2024-01-01',
+        updatedAt: '2024-01-01'
+      },
+      {
+        id: '6',
+        title: 'Tetris Therapy',
+        description: 'Gamified stress relief and cognitive enhancement',
+        icon: 'Gamepad2',
+        color: 'from-cyan-500 to-blue-500',
+        duration: '10-15 min',
+        difficulty: 'Beginner',
+        sessions: 12,
+        category: 'Gamified Therapy',
+        tags: ['gamified', 'stress', 'cognitive'],
+        status: 'active',
+        route: '/therapy-modules/tetris',
+        moduleId: 'tetris',
+        createdAt: '2024-01-01',
+        updatedAt: '2024-01-01'
+      },
+      {
+        id: '7',
+        title: 'Art & Color Therapy',
+        description: 'Creative expression through digital art and coloring',
+        icon: 'Palette',
+        color: 'from-pink-500 to-purple-500',
+        duration: '20-30 min',
+        difficulty: 'Beginner',
+        sessions: 10,
+        category: 'Creative Therapy',
+        tags: ['art', 'creative', 'expression'],
+        status: 'active',
+        route: '/therapy-modules/art',
+        moduleId: 'art',
+        createdAt: '2024-01-01',
+        updatedAt: '2024-01-01'
+      },
+      {
+        id: '8',
+        title: 'Exposure Therapy',
+        description: 'Gradual exposure techniques for anxiety and phobias',
+        icon: 'Target',
+        color: 'from-orange-500 to-red-500',
+        duration: '30-45 min',
+        difficulty: 'Advanced',
+        sessions: 12,
+        category: 'Behavioral Therapy',
+        tags: ['exposure', 'anxiety', 'phobias'],
+        status: 'active',
+        route: '/therapy-modules/exposure',
+        moduleId: 'exposure',
+        createdAt: '2024-01-01',
+        updatedAt: '2024-01-01'
+      },
+      {
+        id: '9',
+        title: 'Video Therapy',
+        description: 'Guided video sessions with therapeutic content',
+        icon: 'Play',
+        color: 'from-blue-500 to-indigo-500',
+        duration: '20-40 min',
+        difficulty: 'Intermediate',
+        sessions: 16,
+        category: 'Educational',
+        tags: ['video', 'educational', 'guided'],
+        status: 'active',
+        route: '/therapy-modules/video',
+        moduleId: 'video',
+        createdAt: '2024-01-01',
+        updatedAt: '2024-01-01'
+      },
+      {
+        id: '10',
+        title: 'Acceptance & Commitment Therapy',
+        description: 'ACT principles for psychological flexibility',
+        icon: 'Star',
+        color: 'from-teal-500 to-cyan-500',
+        duration: '25-35 min',
+        difficulty: 'Intermediate',
+        sessions: 14,
+        category: 'Acceptance Therapy',
+        tags: ['acceptance', 'commitment', 'flexibility'],
+        status: 'active',
+        route: '/therapy-modules/act',
+        moduleId: 'act',
+        createdAt: '2024-01-01',
+        updatedAt: '2024-01-01'
+      }
+    ];
 
-  const colorOptions = [
-    { value: 'from-purple-500 to-pink-500', label: 'Purple to Pink' },
-    { value: 'from-blue-500 to-cyan-500', label: 'Blue to Cyan' },
-    { value: 'from-green-500 to-teal-500', label: 'Green to Teal' },
-    { value: 'from-orange-500 to-red-500', label: 'Orange to Red' },
-    { value: 'from-pink-500 to-rose-500', label: 'Pink to Rose' },
-    { value: 'from-indigo-500 to-purple-500', label: 'Indigo to Purple' },
-    { value: 'from-teal-500 to-cyan-500', label: 'Teal to Cyan' },
-    { value: 'from-yellow-500 to-orange-500', label: 'Yellow to Orange' },
-    { value: 'from-red-500 to-pink-500', label: 'Red to Pink' },
-    { value: 'from-cyan-500 to-blue-500', label: 'Cyan to Blue' }
-  ];
+    // Load any custom modules from localStorage
+    const savedModules = localStorage.getItem('mindcare_admin_therapy_modules');
+    if (savedModules) {
+      const customModules = JSON.parse(savedModules);
+      setTherapyModules([...defaultModules, ...customModules]);
+    } else {
+      setTherapyModules(defaultModules);
+    }
+  };
+
+  const filterModules = () => {
+    let filtered = therapyModules;
+
+    if (searchTerm) {
+      filtered = filtered.filter(module =>
+        module.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        module.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        module.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        module.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
+      );
+    }
+
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(module => module.status === statusFilter);
+    }
+
+    setFilteredModules(filtered);
+  };
+
+  const openModal = (module?: TherapyModule) => {
+    if (module) {
+      setEditingModule(module);
+      setFormData(module);
+    } else {
+      setEditingModule(null);
+      setFormData({
+        title: '',
+        description: '',
+        icon: 'Brain',
+        color: 'from-purple-500 to-pink-500',
+        duration: '15-20 min',
+        difficulty: 'Beginner',
+        sessions: 12,
+        category: 'Cognitive Therapy',
+        tags: [],
+        status: 'active'
+      });
+    }
+    setShowModal(true);
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+    setEditingModule(null);
+    setFormData({
+      title: '',
+      description: '',
+      icon: 'Brain',
+      color: 'from-purple-500 to-pink-500',
+      duration: '15-20 min',
+      difficulty: 'Beginner',
+      sessions: 12,
+      category: 'Cognitive Therapy',
+      tags: [],
+      status: 'active'
+    });
+  };
+
+  const handleInputChange = (field: string, value: any) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleTagToggle = (tag: string) => {
+    setFormData(prev => ({
+      ...prev,
+      tags: prev.tags?.includes(tag)
+        ? prev.tags.filter(t => t !== tag)
+        : [...(prev.tags || []), tag]
+    }));
+  };
+
+  const validateForm = () => {
+    if (!formData.title?.trim()) {
+      toast.error('Title is required');
+      return false;
+    }
+    if (!formData.description?.trim()) {
+      toast.error('Description is required');
+      return false;
+    }
+    if (!formData.duration?.trim()) {
+      toast.error('Duration is required');
+      return false;
+    }
+    if (!formData.sessions || formData.sessions <= 0) {
+      toast.error('Sessions must be a positive number');
+      return false;
+    }
+    return true;
+  };
+
+  const saveModule = () => {
+    if (!validateForm()) return;
+
+    const now = new Date().toISOString();
+    const moduleData: TherapyModule = {
+      id: editingModule?.id || Date.now().toString(),
+      title: formData.title!,
+      description: formData.description!,
+      icon: formData.icon!,
+      color: formData.color!,
+      duration: formData.duration!,
+      difficulty: formData.difficulty!,
+      sessions: formData.sessions!,
+      category: formData.category!,
+      tags: formData.tags || [],
+      status: formData.status!,
+      route: formData.route || `/therapy-modules/${formData.title?.toLowerCase().replace(/\s+/g, '-')}`,
+      moduleId: formData.moduleId || formData.title?.toLowerCase().replace(/\s+/g, '-') || '',
+      createdAt: editingModule?.createdAt || now,
+      updatedAt: now
+    };
+
+    let updatedModules;
+    if (editingModule) {
+      updatedModules = therapyModules.map(m => m.id === editingModule.id ? moduleData : m);
+      toast.success('Therapy module updated successfully!');
+    } else {
+      updatedModules = [...therapyModules, moduleData];
+      toast.success('New therapy module created successfully!');
+    }
+
+    setTherapyModules(updatedModules);
+    
+    // Save custom modules (excluding default ones)
+    const customModules = updatedModules.filter(m => parseInt(m.id) > 10);
+    localStorage.setItem('mindcare_admin_therapy_modules', JSON.stringify(customModules));
+    
+    closeModal();
+  };
+
+  const deleteModule = (moduleId: string) => {
+    const module = therapyModules.find(m => m.id === moduleId);
+    if (!module) return;
+
+    if (window.confirm(`Are you sure you want to delete "${module.title}"? This action cannot be undone.`)) {
+      const updatedModules = therapyModules.filter(m => m.id !== moduleId);
+      setTherapyModules(updatedModules);
+      
+      // Save custom modules
+      const customModules = updatedModules.filter(m => parseInt(m.id) > 10);
+      localStorage.setItem('mindcare_admin_therapy_modules', JSON.stringify(customModules));
+      
+      toast.success('Therapy module deleted successfully!');
+    }
+  };
+
+  const toggleStatus = (moduleId: string) => {
+    const updatedModules = therapyModules.map(m => 
+      m.id === moduleId ? { ...m, status: m.status === 'active' ? 'inactive' : 'active', updatedAt: new Date().toISOString() } : m
+    );
+    setTherapyModules(updatedModules);
+    
+    // Save custom modules
+    const customModules = updatedModules.filter(m => parseInt(m.id) > 10);
+    localStorage.setItem('mindcare_admin_therapy_modules', JSON.stringify(customModules));
+    
+    const module = updatedModules.find(m => m.id === moduleId);
+    toast.success(`${module?.title} ${module?.status === 'active' ? 'activated' : 'deactivated'}`);
+  };
+
+  const getDifficultyColor = (difficulty: string) => {
+    switch (difficulty) {
+      case 'Beginner': return 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300';
+      case 'Intermediate': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300';
+      case 'Advanced': return 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300';
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900/50 dark:text-gray-300';
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    return status === 'active' 
+      ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300'
+      : 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300';
+  };
 
   const getIconComponent = (iconName: string) => {
-    const iconOption = iconOptions.find(opt => opt.value === iconName);
-    return iconOption ? iconOption.component : Brain;
+    const iconOption = ICON_OPTIONS.find(option => option.value === iconName);
+    return iconOption?.component || Brain;
   };
 
-  const handleEditModule = (module: TherapyModule) => {
-    setEditingItem(module);
-    setEditingType('module');
-    setShowEditModal(true);
-  };
-
-  const handleEditAudio = (audio: AudioFile) => {
-    setEditingItem(audio);
-    setEditingType('audio');
-    setShowEditModal(true);
-  };
-
-  const handleEditVideo = (video: VideoFile) => {
-    setEditingItem(video);
-    setEditingType('video');
-    setShowEditModal(true);
-  };
-
-  const handleSaveEdit = () => {
-    if (editingType === 'module') {
-      setTherapyModules(prev => 
-        prev.map(module => 
-          module.id === editingItem.id ? editingItem : module
-        )
-      );
-      toast.success('Therapy module updated successfully!');
-    } else if (editingType === 'audio') {
-      setAudioFiles(prev => 
-        prev.map(audio => 
-          audio.id === editingItem.id ? editingItem : audio
-        )
-      );
-      toast.success('Audio file updated successfully!');
-    } else if (editingType === 'video') {
-      setVideoFiles(prev => 
-        prev.map(video => 
-          video.id === editingItem.id ? editingItem : video
-        )
-      );
-      toast.success('Video file updated successfully!');
+  const stats = [
+    {
+      title: 'Total Therapies',
+      value: therapyModules.length,
+      icon: Brain,
+      color: 'from-blue-500 to-cyan-500'
+    },
+    {
+      title: 'Active Therapies',
+      value: therapyModules.filter(m => m.status === 'active').length,
+      icon: CheckCircle,
+      color: 'from-green-500 to-teal-500'
+    },
+    {
+      title: 'Categories',
+      value: new Set(therapyModules.map(m => m.category)).size,
+      icon: Target,
+      color: 'from-purple-500 to-pink-500'
+    },
+    {
+      title: 'Total Sessions',
+      value: therapyModules.reduce((sum, m) => sum + m.sessions, 0),
+      icon: Clock,
+      color: 'from-orange-500 to-red-500'
     }
-    
-    setShowEditModal(false);
-    setEditingItem(null);
-  };
+  ];
 
-  const handleDeleteModule = (moduleId: string) => {
-    setTherapyModules(prev => prev.filter(module => module.id !== moduleId));
-    toast.success('Therapy module deleted successfully!');
-  };
-
-  const handleDeleteAudio = (audioId: string) => {
-    setAudioFiles(prev => prev.filter(audio => audio.id !== audioId));
-    toast.success('Audio file deleted successfully!');
-  };
-
-  const handleDeleteVideo = (videoId: string) => {
-    setVideoFiles(prev => prev.filter(video => video.id !== videoId));
-    toast.success('Video file deleted successfully!');
-  };
-
-  const handleCreateModule = () => {
-    if (!newModule.title || !newModule.description) {
-      toast.error('Please fill in required fields');
-      return;
-    }
-
-    const module: TherapyModule = {
-      id: Date.now().toString(),
-      title: newModule.title!,
-      description: newModule.description!,
-      category: newModule.category!,
-      icon: newModule.icon!,
-      color: newModule.color!,
-      duration: newModule.duration!,
-      difficulty: newModule.difficulty!,
-      techniques: 0,
-      progress: 0,
-      streak: 0,
-      active: true,
-      subTechniques: []
-    };
-
-    setTherapyModules(prev => [...prev, module]);
-    setNewModule({
-      title: '',
-      description: '',
-      category: '',
-      icon: 'Brain',
-      color: 'from-purple-500 to-blue-500',
-      duration: '',
-      difficulty: 'Beginner',
-      techniques: 0,
-      active: true,
-      subTechniques: []
-    });
-    setShowCreateModal(false);
-    toast.success('New therapy module created successfully!');
-  };
-
-  const handleCreateAudio = () => {
-    if (!newAudio.title || !newAudio.artist) {
-      toast.error('Please fill in required fields');
-      return;
-    }
-
-    const audio: AudioFile = {
-      id: Date.now().toString(),
-      ...newAudio as AudioFile
-    };
-
-    setAudioFiles(prev => [...prev, audio]);
-    setNewAudio({
-      title: '',
-      artist: '',
-      duration: '',
-      category: 'nature',
-      description: '',
-      thumbnail: '',
-      audioUrl: '',
-      active: true
-    });
-    setShowCreateModal(false);
-    toast.success('New audio file added successfully!');
-  };
-
-  const handleCreateVideo = () => {
-    if (!newVideo.title || !newVideo.therapist) {
-      toast.error('Please fill in required fields');
-      return;
-    }
-
-    const video: VideoFile = {
-      id: Date.now().toString(),
-      ...newVideo as VideoFile
-    };
-
-    setVideoFiles(prev => [...prev, video]);
-    setNewVideo({
-      title: '',
-      therapist: '',
-      duration: '',
-      category: 'Anxiety',
-      description: '',
-      thumbnail: '',
-      videoUrl: '',
-      difficulty: 'Beginner',
-      active: true
-    });
-    setShowCreateModal(false);
-    toast.success('New video file added successfully!');
-  };
-
-  const filteredModules = therapyModules.filter(module =>
-    module.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    module.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    module.category.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const filteredAudio = audioFiles.filter(audio =>
-    audio.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    audio.artist.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    audio.category.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const filteredVideo = videoFiles.filter(video =>
-    video.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    video.therapist.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    video.category.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  if (user?.role !== 'admin') {
+    return (
+      <div className={`h-screen flex items-center justify-center ${
+        theme === 'dark' ? 'bg-gray-900' : 'bg-gradient-to-br from-purple-50 via-blue-50 to-teal-50'
+      }`}>
+        <div className="text-center">
+          <h2 className={`text-2xl font-bold mb-4 ${
+            theme === 'dark' ? 'text-white' : 'text-gray-800'
+          }`}>
+            Access Denied
+          </h2>
+          <p className={`${
+            theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
+          }`}>
+            You don't have permission to manage therapy content.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
-      <div className="p-6">
+    <div className={`h-screen flex flex-col ${
+      theme === 'dark' ? 'bg-gray-900' : 'bg-gradient-to-br from-purple-50 via-blue-50 to-teal-50'
+    }`}>
+      <div className="flex-1 overflow-y-auto p-4">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
+          className="mb-4"
         >
-          <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl p-8">
-            <h1 className="text-3xl font-bold text-white mb-2">
-              Therapy Management
-            </h1>
-            <p className="text-purple-100">
-              Create, edit, and manage therapy modules, audio files, and video content
-            </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className={`text-2xl font-bold mb-2 ${
+                theme === 'dark' ? 'text-white' : 'text-gray-800'
+              }`}>
+                Therapy Content Management
+              </h1>
+              <p className={`text-base ${
+                theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
+              }`}>
+                Manage therapy modules, content, and configurations
+              </p>
+            </div>
+            <button
+              onClick={() => openModal()}
+              className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-lg hover:from-purple-600 hover:to-blue-600 transition-all duration-300"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add New Therapy</span>
+            </button>
           </div>
         </motion.div>
 
-        {/* Tab Navigation */}
+        {/* Stats Cards */}
+        <div className="grid md:grid-cols-4 gap-4 mb-4">
+          {stats.map((stat, index) => (
+            <motion.div
+              key={index}
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1 }}
+              className={`p-4 rounded-xl shadow-lg ${
+                theme === 'dark' ? 'bg-gray-800' : 'bg-white'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className={`text-sm font-medium ${
+                    theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
+                  }`}>
+                    {stat.title}
+                  </h3>
+                  <p className={`text-xl font-bold ${
+                    theme === 'dark' ? 'text-white' : 'text-gray-800'
+                  }`}>
+                    {stat.value}
+                  </p>
+                </div>
+                <div className={`w-10 h-10 rounded-lg bg-gradient-to-r ${stat.color} flex items-center justify-center`}>
+                  <stat.icon className="w-5 h-5 text-white" />
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+
+        {/* Search and Filter */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="mb-6"
+          transition={{ delay: 0.4 }}
+          className={`mb-4 p-4 rounded-xl shadow-lg ${
+            theme === 'dark' ? 'bg-gray-800' : 'bg-white'
+          }`}
         >
-          <div className="flex space-x-1 bg-gray-800 p-1 rounded-xl">
-            {[
-              { id: 'modules', label: 'Therapy Modules', icon: Brain },
-              { id: 'audio', label: 'Audio Files', icon: Music },
-              { id: 'video', label: 'Video Files', icon: Video }
-            ].map((tab) => (
-              <motion.button
-                key={tab.id}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setSelectedTab(tab.id as any)}
-                className={`flex items-center space-x-2 px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
-                  selectedTab === tab.id
-                    ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white'
-                    : 'text-gray-400 hover:text-white hover:bg-gray-700'
-                }`}
-              >
-                <tab.icon className="w-5 h-5" />
-                <span>{tab.label}</span>
-              </motion.button>
-            ))}
+          <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="relative">
+                <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 ${
+                  theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                }`} />
+                <input
+                  type="text"
+                  placeholder="Search therapies..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className={`pl-10 pr-4 py-2 rounded-lg border ${
+                    theme === 'dark'
+                      ? 'bg-gray-700 border-gray-600 text-white'
+                      : 'bg-white border-gray-300 text-gray-900'
+                  } focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                />
+              </div>
+              <div className="flex space-x-2">
+                {(['all', 'active', 'inactive'] as const).map((status) => (
+                  <button
+                    key={status}
+                    onClick={() => setStatusFilter(status)}
+                    className={`px-3 py-2 rounded-lg font-medium transition-all duration-200 capitalize ${
+                      statusFilter === status
+                        ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white'
+                        : theme === 'dark'
+                        ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    {status}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </motion.div>
 
-        {/* Content Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center space-x-4">
-            <h2 className="text-2xl font-bold">
-              {selectedTab === 'modules' && `Therapy Modules (${filteredModules.length})`}
-              {selectedTab === 'audio' && `Audio Files (${filteredAudio.length})`}
-              {selectedTab === 'video' && `Video Files (${filteredVideo.length})`}
-            </h2>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
-              />
-            </div>
-          </div>
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => setShowCreateModal(true)}
-            className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-xl font-semibold hover:from-purple-600 hover:to-blue-600 transition-all duration-300"
-          >
-            <Plus className="w-5 h-5" />
-            <span>
-              {selectedTab === 'modules' && 'Create Module'}
-              {selectedTab === 'audio' && 'Add Audio'}
-              {selectedTab === 'video' && 'Add Video'}
-            </span>
-          </motion.button>
+        {/* Therapy Modules Grid */}
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {filteredModules.map((module, index) => {
+            const IconComponent = getIconComponent(module.icon);
+            return (
+              <motion.div
+                key={module.id}
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5 + index * 0.1 }}
+                className={`p-4 rounded-xl shadow-lg transition-all duration-300 ${
+                  theme === 'dark' ? 'bg-gray-800 hover:bg-gray-700' : 'bg-white hover:shadow-xl'
+                }`}
+              >
+                {/* Header */}
+                <div className="flex items-start justify-between mb-3">
+                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-r ${module.color} flex items-center justify-center`}>
+                    <IconComponent className="w-6 h-6 text-white" />
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => toggleStatus(module.id)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        module.status === 'active' ? 'bg-green-500' : 'bg-gray-300'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          module.status === 'active' ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Content */}
+                <h3 className={`text-base font-semibold mb-2 ${
+                  theme === 'dark' ? 'text-white' : 'text-gray-800'
+                }`}>
+                  {module.title}
+                </h3>
+                
+                <p className={`text-xs mb-3 line-clamp-2 ${
+                  theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
+                }`}>
+                  {module.description}
+                </p>
+
+                {/* Details */}
+                <div className="space-y-2 mb-3">
+                  <div className="flex items-center justify-between">
+                    <span className={`text-xs ${
+                      theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
+                    }`}>
+                      Duration:
+                    </span>
+                    <span className={`text-xs font-medium ${
+                      theme === 'dark' ? 'text-white' : 'text-gray-800'
+                    }`}>
+                      {module.duration}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className={`text-xs ${
+                      theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
+                    }`}>
+                      Sessions:
+                    </span>
+                    <span className={`text-xs font-medium ${
+                      theme === 'dark' ? 'text-white' : 'text-gray-800'
+                    }`}>
+                      {module.sessions}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Badges */}
+                <div className="flex items-center justify-between mb-3">
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${getDifficultyColor(module.difficulty)}`}>
+                    {module.difficulty}
+                  </span>
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(module.status)}`}>
+                    {module.status}
+                  </span>
+                </div>
+
+                {/* Category */}
+                <div className="mb-3">
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    theme === 'dark' ? 'bg-purple-900/50 text-purple-300' : 'bg-purple-100 text-purple-700'
+                  }`}>
+                    {module.category}
+                  </span>
+                </div>
+
+                {/* Tags */}
+                {module.tags.length > 0 && (
+                  <div className="mb-3">
+                    <div className="flex flex-wrap gap-1">
+                      {module.tags.slice(0, 3).map((tag, idx) => (
+                        <span
+                          key={idx}
+                          className={`px-2 py-1 rounded-full text-xs ${
+                            theme === 'dark' ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'
+                          }`}
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                      {module.tags.length > 3 && (
+                        <span className={`px-2 py-1 rounded-full text-xs ${
+                          theme === 'dark' ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'
+                        }`}>
+                          +{module.tags.length - 3}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div className="flex items-center justify-between">
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => openModal(module)}
+                      className="p-2 text-gray-500 hover:text-blue-600 transition-colors"
+                      title="Edit therapy"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => deleteModule(module.id)}
+                      className="p-2 text-gray-500 hover:text-red-600 transition-colors"
+                      title="Delete therapy"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <span className={`text-xs ${
+                    theme === 'dark' ? 'text-gray-500' : 'text-gray-500'
+                  }`}>
+                    Updated {new Date(module.updatedAt).toLocaleDateString()}
+                  </span>
+                </div>
+              </motion.div>
+            );
+          })}
         </div>
 
-        {/* Content Grid */}
-        <AnimatePresence mode="wait">
-          {selectedTab === 'modules' && (
-            <motion.div
-              key="modules"
-              initial={{ opacity: 0, x: -30 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 30 }}
-              className="grid md:grid-cols-2 lg:grid-cols-3 gap-6"
-            >
-              {filteredModules.map((module, index) => {
-                const IconComponent = getIconComponent(module.icon);
-                return (
-                  <motion.div
-                    key={module.id}
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                    className="bg-gray-800 rounded-xl p-6 border border-gray-700 hover:border-gray-600 transition-all duration-300"
-                  >
-                    <div className="flex items-start justify-between mb-4">
-                      <div className={`w-12 h-12 rounded-xl bg-gradient-to-r ${module.color} flex items-center justify-center`}>
-                        <IconComponent className="w-6 h-6 text-white" />
-                      </div>
-                      <div className="flex space-x-2">
-                        <motion.button
-                          whileHover={{ scale: 1.1 }}
-                          whileTap={{ scale: 0.9 }}
-                          onClick={() => handleEditModule(module)}
-                          className="p-2 text-gray-400 hover:text-blue-400 transition-colors"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </motion.button>
-                        <motion.button
-                          whileHover={{ scale: 1.1 }}
-                          whileTap={{ scale: 0.9 }}
-                          onClick={() => handleDeleteModule(module.id)}
-                          className="p-2 text-gray-400 hover:text-red-400 transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </motion.button>
-                      </div>
-                    </div>
-
-                    <h3 className="text-xl font-bold text-white mb-2">
-                      {module.title}
-                    </h3>
-                    <p className="text-gray-400 text-sm mb-4">
-                      {module.description}
-                    </p>
-
-                    <div className="flex items-center justify-between mb-4">
-                      <span className="px-3 py-1 bg-gray-700 text-gray-300 rounded-full text-sm">
-                        {module.category}
-                      </span>
-                      <span className="text-gray-400 text-sm">
-                        {module.techniques} techniques
-                      </span>
-                    </div>
-
-                    <div className="text-gray-500 text-sm">
-                      Progress: {module.progress}/3 • Streak: {module.streak}
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </motion.div>
-          )}
-
-          {selectedTab === 'audio' && (
-            <motion.div
-              key="audio"
-              initial={{ opacity: 0, x: -30 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 30 }}
-              className="grid md:grid-cols-2 lg:grid-cols-3 gap-6"
-            >
-              {filteredAudio.map((audio, index) => (
-                <motion.div
-                  key={audio.id}
-                  initial={{ opacity: 0, y: 30 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                  className="bg-gray-800 rounded-xl overflow-hidden border border-gray-700 hover:border-gray-600 transition-all duration-300"
-                >
-                  <div className="relative h-48">
-                    <img
-                      src={audio.thumbnail}
-                      alt={audio.title}
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity duration-300">
-                      <Play className="w-12 h-12 text-white" />
-                    </div>
-                    <div className="absolute top-3 right-3 flex space-x-2">
-                      <motion.button
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
-                        onClick={() => handleEditAudio(audio)}
-                        className="p-2 bg-black bg-opacity-50 text-white rounded-lg hover:bg-opacity-70 transition-all"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </motion.button>
-                      <motion.button
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
-                        onClick={() => handleDeleteAudio(audio.id)}
-                        className="p-2 bg-black bg-opacity-50 text-white rounded-lg hover:bg-opacity-70 transition-all"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </motion.button>
-                    </div>
-                    <div className="absolute bottom-3 left-3 bg-black bg-opacity-70 text-white px-2 py-1 rounded text-sm">
-                      {audio.duration}
-                    </div>
-                  </div>
-                  <div className="p-4">
-                    <h3 className="text-lg font-bold text-white mb-1">
-                      {audio.title}
-                    </h3>
-                    <p className="text-gray-400 text-sm mb-2">
-                      by {audio.artist}
-                    </p>
-                    <p className="text-gray-500 text-sm mb-3">
-                      {audio.description}
-                    </p>
-                    <div className="flex items-center justify-between">
-                      <span className="px-2 py-1 bg-teal-900 text-teal-300 rounded text-xs">
-                        {audio.category}
-                      </span>
-                      <span className="text-gray-400 text-sm">
-                        {audio.duration}
-                      </span>
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-            </motion.div>
-          )}
-
-          {selectedTab === 'video' && (
-            <motion.div
-              key="video"
-              initial={{ opacity: 0, x: -30 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 30 }}
-              className="grid md:grid-cols-2 lg:grid-cols-3 gap-6"
-            >
-              {filteredVideo.map((video, index) => (
-                <motion.div
-                  key={video.id}
-                  initial={{ opacity: 0, y: 30 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                  className="bg-gray-800 rounded-xl overflow-hidden border border-gray-700 hover:border-gray-600 transition-all duration-300"
-                >
-                  <div className="relative h-48">
-                    <img
-                      src={video.thumbnail}
-                      alt={video.title}
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity duration-300">
-                      <Play className="w-12 h-12 text-white" />
-                    </div>
-                    <div className="absolute top-3 right-3 flex space-x-2">
-                      <motion.button
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
-                        onClick={() => handleEditVideo(video)}
-                        className="p-2 bg-black bg-opacity-50 text-white rounded-lg hover:bg-opacity-70 transition-all"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </motion.button>
-                      <motion.button
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
-                        onClick={() => handleDeleteVideo(video.id)}
-                        className="p-2 bg-black bg-opacity-50 text-white rounded-lg hover:bg-opacity-70 transition-all"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </motion.button>
-                    </div>
-                    <div className="absolute bottom-3 left-3 bg-black bg-opacity-70 text-white px-2 py-1 rounded text-sm">
-                      {video.duration}
-                    </div>
-                  </div>
-                  <div className="p-4">
-                    <h3 className="text-lg font-bold text-white mb-1">
-                      {video.title}
-                    </h3>
-                    <p className="text-gray-400 text-sm mb-2">
-                      with {video.therapist}
-                    </p>
-                    <p className="text-gray-500 text-sm mb-3">
-                      {video.description}
-                    </p>
-                    <div className="flex items-center justify-between">
-                      <span className="px-2 py-1 bg-blue-900 text-blue-300 rounded text-xs">
-                        {video.category}
-                      </span>
-                      <span className="px-2 py-1 bg-gray-700 text-gray-300 rounded text-xs">
-                        {video.difficulty}
-                      </span>
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Create Modal */}
+        {/* Add/Edit Modal */}
         <AnimatePresence>
-          {showCreateModal && (
+          {showModal && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-              onClick={() => setShowCreateModal(false)}
+              onClick={closeModal}
             >
               <motion.div
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.9, opacity: 0 }}
-                className="bg-gray-800 rounded-2xl p-6 max-w-2xl w-full max-h-96 overflow-y-auto"
+                className={`max-w-4xl w-full max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl ${
+                  theme === 'dark' ? 'bg-gray-800' : 'bg-white'
+                }`}
                 onClick={(e) => e.stopPropagation()}
               >
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-2xl font-bold text-white">
-                    {selectedTab === 'modules' && 'Create New Therapy Module'}
-                    {selectedTab === 'audio' && 'Add New Audio File'}
-                    {selectedTab === 'video' && 'Add New Video File'}
-                  </h3>
-                  <button
-                    onClick={() => setShowCreateModal(false)}
-                    className="p-2 text-gray-400 hover:text-white transition-colors"
-                  >
-                    <X className="w-6 h-6" />
-                  </button>
-                </div>
+                <div className="p-6">
+                  {/* Modal Header */}
+                  <div className="flex items-center justify-between mb-6">
+                    <h2 className={`text-2xl font-bold ${
+                      theme === 'dark' ? 'text-white' : 'text-gray-800'
+                    }`}>
+                      {editingModule ? 'Edit Therapy Module' : 'Add New Therapy Module'}
+                    </h2>
+                    <button
+                      onClick={closeModal}
+                      className={`p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
+                        theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
+                      }`}
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
 
-                {selectedTab === 'modules' && (
-                  <div className="space-y-4">
-                    <div className="grid md:grid-cols-2 gap-4">
+                  {/* Form */}
+                  <div className="grid md:grid-cols-2 gap-6">
+                    {/* Left Column */}
+                    <div className="space-y-4">
+                      {/* Title */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Module Title *
+                        <label className={`block text-sm font-medium mb-2 ${
+                          theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+                        }`}>
+                          Title *
                         </label>
                         <input
                           type="text"
-                          value={newModule.title}
-                          onChange={(e) => setNewModule(prev => ({ ...prev, title: e.target.value }))}
-                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                          placeholder="Enter module title"
+                          value={formData.title || ''}
+                          onChange={(e) => handleInputChange('title', e.target.value)}
+                          placeholder="Enter therapy title"
+                          className={`w-full px-4 py-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                            theme === 'dark'
+                              ? 'bg-gray-700 border-gray-600 text-white'
+                              : 'bg-white border-gray-300 text-gray-900'
+                          }`}
                         />
                       </div>
+
+                      {/* Description */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Category *
+                        <label className={`block text-sm font-medium mb-2 ${
+                          theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+                        }`}>
+                          Description *
                         </label>
-                        <input
-                          type="text"
-                          value={newModule.category}
-                          onChange={(e) => setNewModule(prev => ({ ...prev, category: e.target.value }))}
-                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                          placeholder="e.g., CBT, Mindfulness"
+                        <textarea
+                          value={formData.description || ''}
+                          onChange={(e) => handleInputChange('description', e.target.value)}
+                          placeholder="Describe the therapy module"
+                          rows={3}
+                          className={`w-full px-4 py-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none ${
+                            theme === 'dark'
+                              ? 'bg-gray-700 border-gray-600 text-white'
+                              : 'bg-white border-gray-300 text-gray-900'
+                          }`}
                         />
                       </div>
-                    </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Description *
-                      </label>
-                      <textarea
-                        value={newModule.description}
-                        onChange={(e) => setNewModule(prev => ({ ...prev, description: e.target.value }))}
-                        rows={3}
-                        className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
-                        placeholder="Describe what this module does..."
-                      />
-                    </div>
-
-                    <div className="grid md:grid-cols-2 gap-4">
+                      {/* Icon Selection */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                        <label className={`block text-sm font-medium mb-2 ${
+                          theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+                        }`}>
                           Icon
                         </label>
                         <select
-                          value={newModule.icon}
-                          onChange={(e) => setNewModule(prev => ({ ...prev, icon: e.target.value }))}
-                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          value={formData.icon || 'Brain'}
+                          onChange={(e) => handleInputChange('icon', e.target.value)}
+                          className={`w-full px-4 py-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                            theme === 'dark'
+                              ? 'bg-gray-700 border-gray-600 text-white'
+                              : 'bg-white border-gray-300 text-gray-900'
+                          }`}
                         >
-                          {iconOptions.map(option => (
+                          {ICON_OPTIONS.map((option) => (
                             <option key={option.value} value={option.value}>
                               {option.label}
                             </option>
                           ))}
                         </select>
                       </div>
+
+                      {/* Color Gradient */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                        <label className={`block text-sm font-medium mb-2 ${
+                          theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+                        }`}>
                           Color Gradient
                         </label>
                         <select
-                          value={newModule.color}
-                          onChange={(e) => setNewModule(prev => ({ ...prev, color: e.target.value }))}
-                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          value={formData.color || 'from-purple-500 to-pink-500'}
+                          onChange={(e) => handleInputChange('color', e.target.value)}
+                          className={`w-full px-4 py-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                            theme === 'dark'
+                              ? 'bg-gray-700 border-gray-600 text-white'
+                              : 'bg-white border-gray-300 text-gray-900'
+                          }`}
                         >
-                          {colorOptions.map(option => (
+                          {COLOR_OPTIONS.map((option) => (
                             <option key={option.value} value={option.value}>
                               {option.label}
                             </option>
                           ))}
                         </select>
+                        {/* Color Preview */}
+                        <div className="mt-2">
+                          <div className={`w-full h-8 rounded-lg bg-gradient-to-r ${formData.color}`}></div>
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="grid md:grid-cols-2 gap-4">
+                      {/* Duration */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Duration
+                        <label className={`block text-sm font-medium mb-2 ${
+                          theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+                        }`}>
+                          Duration *
                         </label>
                         <input
                           type="text"
-                          value={newModule.duration}
-                          onChange={(e) => setNewModule(prev => ({ ...prev, duration: e.target.value }))}
-                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                          placeholder="e.g., 15-30 min"
+                          value={formData.duration || ''}
+                          onChange={(e) => handleInputChange('duration', e.target.value)}
+                          placeholder="e.g., 15-20 min"
+                          className={`w-full px-4 py-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                            theme === 'dark'
+                              ? 'bg-gray-700 border-gray-600 text-white'
+                              : 'bg-white border-gray-300 text-gray-900'
+                          }`}
                         />
                       </div>
+                    </div>
+
+                    {/* Right Column */}
+                    <div className="space-y-4">
+                      {/* Difficulty Level */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                        <label className={`block text-sm font-medium mb-2 ${
+                          theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+                        }`}>
                           Difficulty Level
                         </label>
                         <select
-                          value={newModule.difficulty}
-                          onChange={(e) => setNewModule(prev => ({ ...prev, difficulty: e.target.value as any }))}
-                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          value={formData.difficulty || 'Beginner'}
+                          onChange={(e) => handleInputChange('difficulty', e.target.value)}
+                          className={`w-full px-4 py-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                            theme === 'dark'
+                              ? 'bg-gray-700 border-gray-600 text-white'
+                              : 'bg-white border-gray-300 text-gray-900'
+                          }`}
                         >
                           <option value="Beginner">Beginner</option>
                           <option value="Intermediate">Intermediate</option>
                           <option value="Advanced">Advanced</option>
                         </select>
                       </div>
-                    </div>
 
-                    <div className="flex space-x-4 pt-4">
-                      <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={handleCreateModule}
-                        className="flex-1 py-3 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-lg font-semibold hover:from-green-600 hover:to-teal-600 transition-all duration-300"
-                      >
-                        Create Module
-                      </motion.button>
-                      <button
-                        onClick={() => setShowCreateModal(false)}
-                        className="flex-1 py-3 bg-gray-700 text-gray-300 rounded-lg font-semibold hover:bg-gray-600 transition-colors"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {selectedTab === 'audio' && (
-                  <div className="space-y-4">
-                    <div className="grid md:grid-cols-2 gap-4">
+                      {/* Sessions */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Song Title *
+                        <label className={`block text-sm font-medium mb-2 ${
+                          theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+                        }`}>
+                          Number of Sessions *
                         </label>
                         <input
-                          type="text"
-                          value={newAudio.title}
-                          onChange={(e) => setNewAudio(prev => ({ ...prev, title: e.target.value }))}
-                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                          placeholder="Enter song title"
+                          type="number"
+                          min="1"
+                          max="100"
+                          value={formData.sessions || ''}
+                          onChange={(e) => handleInputChange('sessions', parseInt(e.target.value))}
+                          placeholder="12"
+                          className={`w-full px-4 py-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                            theme === 'dark'
+                              ? 'bg-gray-700 border-gray-600 text-white'
+                              : 'bg-white border-gray-300 text-gray-900'
+                          }`}
                         />
                       </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Artist Name *
-                        </label>
-                        <input
-                          type="text"
-                          value={newAudio.artist}
-                          onChange={(e) => setNewAudio(prev => ({ ...prev, artist: e.target.value }))}
-                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                          placeholder="Enter artist name"
-                        />
-                      </div>
-                    </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Description
-                      </label>
-                      <textarea
-                        value={newAudio.description}
-                        onChange={(e) => setNewAudio(prev => ({ ...prev, description: e.target.value }))}
-                        rows={3}
-                        className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
-                        placeholder="Describe the audio content..."
-                      />
-                    </div>
-
-                    <div className="grid md:grid-cols-2 gap-4">
+                      {/* Category */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Duration
-                        </label>
-                        <input
-                          type="text"
-                          value={newAudio.duration}
-                          onChange={(e) => setNewAudio(prev => ({ ...prev, duration: e.target.value }))}
-                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                          placeholder="e.g., 45 min"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                        <label className={`block text-sm font-medium mb-2 ${
+                          theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+                        }`}>
                           Category
                         </label>
                         <select
-                          value={newAudio.category}
-                          onChange={(e) => setNewAudio(prev => ({ ...prev, category: e.target.value }))}
-                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          value={formData.category || 'Cognitive Therapy'}
+                          onChange={(e) => handleInputChange('category', e.target.value)}
+                          className={`w-full px-4 py-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                            theme === 'dark'
+                              ? 'bg-gray-700 border-gray-600 text-white'
+                              : 'bg-white border-gray-300 text-gray-900'
+                          }`}
                         >
-                          <option value="nature">Nature</option>
-                          <option value="meditation">Meditation</option>
-                          <option value="sleep">Sleep</option>
-                          <option value="focus">Focus</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Thumbnail URL
-                        </label>
-                        <input
-                          type="url"
-                          value={newAudio.thumbnail}
-                          onChange={(e) => setNewAudio(prev => ({ ...prev, thumbnail: e.target.value }))}
-                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                          placeholder="https://example.com/thumbnail.jpg"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Audio URL
-                        </label>
-                        <input
-                          type="url"
-                          value={newAudio.audioUrl}
-                          onChange={(e) => setNewAudio(prev => ({ ...prev, audioUrl: e.target.value }))}
-                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                          placeholder="https://example.com/audio.mp3"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex space-x-4 pt-4">
-                      <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={handleCreateAudio}
-                        className="flex-1 py-3 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-lg font-semibold hover:from-green-600 hover:to-teal-600 transition-all duration-300"
-                      >
-                        Add Audio
-                      </motion.button>
-                      <button
-                        onClick={() => setShowCreateModal(false)}
-                        className="flex-1 py-3 bg-gray-700 text-gray-300 rounded-lg font-semibold hover:bg-gray-600 transition-colors"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {selectedTab === 'video' && (
-                  <div className="space-y-4">
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Video Title *
-                        </label>
-                        <input
-                          type="text"
-                          value={newVideo.title}
-                          onChange={(e) => setNewVideo(prev => ({ ...prev, title: e.target.value }))}
-                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                          placeholder="Enter video title"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Therapist Name *
-                        </label>
-                        <input
-                          type="text"
-                          value={newVideo.therapist}
-                          onChange={(e) => setNewVideo(prev => ({ ...prev, therapist: e.target.value }))}
-                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                          placeholder="Enter therapist name"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Description
-                      </label>
-                      <textarea
-                        value={newVideo.description}
-                        onChange={(e) => setNewVideo(prev => ({ ...prev, description: e.target.value }))}
-                        rows={3}
-                        className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
-                        placeholder="Describe the video content..."
-                      />
-                    </div>
-
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Duration
-                        </label>
-                        <input
-                          type="text"
-                          value={newVideo.duration}
-                          onChange={(e) => setNewVideo(prev => ({ ...prev, duration: e.target.value }))}
-                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                          placeholder="e.g., 20 min"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Category
-                        </label>
-                        <select
-                          value={newVideo.category}
-                          onChange={(e) => setNewVideo(prev => ({ ...prev, category: e.target.value }))}
-                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        >
-                          <option value="Anxiety">Anxiety</option>
-                          <option value="Depression">Depression</option>
-                          <option value="PTSD">PTSD</option>
-                          <option value="Mindfulness">Mindfulness</option>
-                          <option value="CBT">CBT</option>
-                          <option value="Sleep">Sleep</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Thumbnail URL
-                        </label>
-                        <input
-                          type="url"
-                          value={newVideo.thumbnail}
-                          onChange={(e) => setNewVideo(prev => ({ ...prev, thumbnail: e.target.value }))}
-                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                          placeholder="https://example.com/thumbnail.jpg"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Video URL
-                        </label>
-                        <input
-                          type="url"
-                          value={newVideo.videoUrl}
-                          onChange={(e) => setNewVideo(prev => ({ ...prev, videoUrl: e.target.value }))}
-                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                          placeholder="https://example.com/video.mp4"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex space-x-4 pt-4">
-                      <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={handleCreateVideo}
-                        className="flex-1 py-3 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-lg font-semibold hover:from-green-600 hover:to-teal-600 transition-all duration-300"
-                      >
-                        Add Video
-                      </motion.button>
-                      <button
-                        onClick={() => setShowCreateModal(false)}
-                        className="flex-1 py-3 bg-gray-700 text-gray-300 rounded-lg font-semibold hover:bg-gray-600 transition-colors"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Edit Modal */}
-        <AnimatePresence>
-          {showEditModal && editingItem && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-              onClick={() => setShowEditModal(false)}
-            >
-              <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.9, opacity: 0 }}
-                className="bg-gray-800 rounded-2xl p-6 max-w-2xl w-full max-h-96 overflow-y-auto"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-2xl font-bold text-white">
-                    Edit {editingType === 'module' ? 'Therapy Module' : editingType === 'audio' ? 'Audio File' : 'Video File'}
-                  </h3>
-                  <button
-                    onClick={() => setShowEditModal(false)}
-                    className="p-2 text-gray-400 hover:text-white transition-colors"
-                  >
-                    <X className="w-6 h-6" />
-                  </button>
-                </div>
-
-                {editingType === 'module' && (
-                  <div className="space-y-4">
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Module Title
-                        </label>
-                        <input
-                          type="text"
-                          value={editingItem.title}
-                          onChange={(e) => setEditingItem(prev => ({ ...prev, title: e.target.value }))}
-                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Category
-                        </label>
-                        <input
-                          type="text"
-                          value={editingItem.category}
-                          onChange={(e) => setEditingItem(prev => ({ ...prev, category: e.target.value }))}
-                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Description
-                      </label>
-                      <textarea
-                        value={editingItem.description}
-                        onChange={(e) => setEditingItem(prev => ({ ...prev, description: e.target.value }))}
-                        rows={3}
-                        className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
-                      />
-                    </div>
-
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Icon
-                        </label>
-                        <select
-                          value={editingItem.icon}
-                          onChange={(e) => setEditingItem(prev => ({ ...prev, icon: e.target.value }))}
-                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        >
-                          {iconOptions.map(option => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
+                          {CATEGORY_OPTIONS.map((category) => (
+                            <option key={category} value={category}>
+                              {category}
                             </option>
                           ))}
                         </select>
                       </div>
+
+                      {/* Tags */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Color Gradient
+                        <label className={`block text-sm font-medium mb-2 ${
+                          theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+                        }`}>
+                          Tags (Select all that apply)
                         </label>
-                        <select
-                          value={editingItem.color}
-                          onChange={(e) => setEditingItem(prev => ({ ...prev, color: e.target.value }))}
-                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        >
-                          {colorOptions.map(option => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
+                        <div className="grid grid-cols-3 gap-2 max-h-32 overflow-y-auto">
+                          {TAG_OPTIONS.map((tag) => (
+                            <motion.button
+                              key={tag}
+                              whileHover={{ scale: 1.02 }}
+                              whileTap={{ scale: 0.98 }}
+                              onClick={() => handleTagToggle(tag)}
+                              className={`px-2 py-1 rounded-lg text-xs font-medium transition-all duration-200 ${
+                                formData.tags?.includes(tag)
+                                  ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white'
+                                  : theme === 'dark'
+                                  ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                              }`}
+                            >
+                              {tag}
+                            </motion.button>
                           ))}
-                        </select>
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="grid md:grid-cols-2 gap-4">
+                      {/* Status */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Duration
+                        <label className={`block text-sm font-medium mb-2 ${
+                          theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+                        }`}>
+                          Status
                         </label>
-                        <input
-                          type="text"
-                          value={editingItem.duration}
-                          onChange={(e) => setEditingItem(prev => ({ ...prev, duration: e.target.value }))}
-                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Difficulty
-                        </label>
-                        <select
-                          value={editingItem.difficulty}
-                          onChange={(e) => setEditingItem(prev => ({ ...prev, difficulty: e.target.value }))}
-                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        >
-                          <option value="Beginner">Beginner</option>
-                          <option value="Intermediate">Intermediate</option>
-                          <option value="Advanced">Advanced</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {editingType === 'audio' && (
-                  <div className="space-y-4">
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Song Title
-                        </label>
-                        <input
-                          type="text"
-                          value={editingItem.title}
-                          onChange={(e) => setEditingItem(prev => ({ ...prev, title: e.target.value }))}
-                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Artist Name
-                        </label>
-                        <input
-                          type="text"
-                          value={editingItem.artist}
-                          onChange={(e) => setEditingItem(prev => ({ ...prev, artist: e.target.value }))}
-                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Description
-                      </label>
-                      <textarea
-                        value={editingItem.description}
-                        onChange={(e) => setEditingItem(prev => ({ ...prev, description: e.target.value }))}
-                        rows={3}
-                        className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
-                      />
-                    </div>
-
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Duration
-                        </label>
-                        <input
-                          type="text"
-                          value={editingItem.duration}
-                          onChange={(e) => setEditingItem(prev => ({ ...prev, duration: e.target.value }))}
-                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Category
-                        </label>
-                        <select
-                          value={editingItem.category}
-                          onChange={(e) => setEditingItem(prev => ({ ...prev, category: e.target.value }))}
-                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        >
-                          <option value="nature">Nature</option>
-                          <option value="meditation">Meditation</option>
-                          <option value="sleep">Sleep</option>
-                          <option value="focus">Focus</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Thumbnail URL
-                        </label>
-                        <input
-                          type="url"
-                          value={editingItem.thumbnail}
-                          onChange={(e) => setEditingItem(prev => ({ ...prev, thumbnail: e.target.value }))}
-                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Audio URL
-                        </label>
-                        <input
-                          type="url"
-                          value={editingItem.audioUrl}
-                          onChange={(e) => setEditingItem(prev => ({ ...prev, audioUrl: e.target.value }))}
-                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        />
+                        <div className="flex items-center space-x-3">
+                          <button
+                            onClick={() => handleInputChange('status', formData.status === 'active' ? 'inactive' : 'active')}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                              formData.status === 'active' ? 'bg-green-500' : 'bg-gray-300'
+                            }`}
+                          >
+                            <span
+                              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                formData.status === 'active' ? 'translate-x-6' : 'translate-x-1'
+                              }`}
+                            />
+                          </button>
+                          <span className={`text-sm font-medium ${
+                            theme === 'dark' ? 'text-white' : 'text-gray-800'
+                          }`}>
+                            {formData.status === 'active' ? 'Active' : 'Inactive'}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
-                )}
 
-                {editingType === 'video' && (
-                  <div className="space-y-4">
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Video Title
-                        </label>
-                        <input
-                          type="text"
-                          value={editingItem.title}
-                          onChange={(e) => setEditingItem(prev => ({ ...prev, title: e.target.value }))}
-                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        />
+                  {/* Preview */}
+                  <div className="mt-6">
+                    <h3 className={`text-lg font-semibold mb-3 ${
+                      theme === 'dark' ? 'text-white' : 'text-gray-800'
+                    }`}>
+                      Preview
+                    </h3>
+                    <div className={`p-4 rounded-xl border-2 border-dashed ${
+                      theme === 'dark' ? 'border-gray-600 bg-gray-700/50' : 'border-gray-300 bg-gray-50'
+                    }`}>
+                      <div className="flex items-start space-x-4">
+                        <div className={`w-12 h-12 rounded-xl bg-gradient-to-r ${formData.color} flex items-center justify-center`}>
+                          {React.createElement(getIconComponent(formData.icon || 'Brain'), {
+                            className: "w-6 h-6 text-white"
+                          })}
+                        </div>
+                        <div className="flex-1">
+                          <h4 className={`font-semibold ${
+                            theme === 'dark' ? 'text-white' : 'text-gray-800'
+                          }`}>
+                            {formData.title || 'Therapy Title'}
+                          </h4>
+                          <p className={`text-sm ${
+                            theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
+                          }`}>
+                            {formData.description || 'Therapy description will appear here'}
+                          </p>
+                          <div className="flex items-center space-x-2 mt-2">
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getDifficultyColor(formData.difficulty || 'Beginner')}`}>
+                              {formData.difficulty}
+                            </span>
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              theme === 'dark' ? 'bg-purple-900/50 text-purple-300' : 'bg-purple-100 text-purple-700'
+                            }`}>
+                              {formData.category}
+                            </span>
+                            <span className={`text-xs ${
+                              theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
+                            }`}>
+                              {formData.duration} • {formData.sessions} sessions
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Therapist Name
-                        </label>
-                        <input
-                          type="text"
-                          value={editingItem.therapist}
-                          onChange={(e) => setEditingItem(prev => ({ ...prev, therapist: e.target.value }))}
-                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Description
-                      </label>
-                      <textarea
-                        value={editingItem.description}
-                        onChange={(e) => setEditingItem(prev => ({ ...prev, description: e.target.value }))}
-                        rows={3}
-                        className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
-                      />
-                    </div>
-
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Duration
-                        </label>
-                        <input
-                          type="text"
-                          value={editingItem.duration}
-                          onChange={(e) => setEditingItem(prev => ({ ...prev, duration: e.target.value }))}
-                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Category
-                        </label>
-                        <select
-                          value={editingItem.category}
-                          onChange={(e) => setEditingItem(prev => ({ ...prev, category: e.target.value }))}
-                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        >
-                          <option value="Anxiety">Anxiety</option>
-                          <option value="Depression">Depression</option>
-                          <option value="PTSD">PTSD</option>
-                          <option value="Mindfulness">Mindfulness</option>
-                          <option value="CBT">CBT</option>
-                          <option value="Sleep">Sleep</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Thumbnail URL
-                        </label>
-                        <input
-                          type="url"
-                          value={editingItem.thumbnail}
-                          onChange={(e) => setEditingItem(prev => ({ ...prev, thumbnail: e.target.value }))}
-                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Video URL
-                        </label>
-                        <input
-                          type="url"
-                          value={editingItem.videoUrl}
-                          onChange={(e) => setEditingItem(prev => ({ ...prev, videoUrl: e.target.value }))}
-                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Difficulty
-                      </label>
-                      <select
-                        value={editingItem.difficulty}
-                        onChange={(e) => setEditingItem(prev => ({ ...prev, difficulty: e.target.value }))}
-                        className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                      >
-                        <option value="Beginner">Beginner</option>
-                        <option value="Intermediate">Intermediate</option>
-                        <option value="Advanced">Advanced</option>
-                      </select>
                     </div>
                   </div>
-                )}
 
-                <div className="flex space-x-4 pt-6">
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={handleSaveEdit}
-                    className="flex-1 py-3 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-lg font-semibold hover:from-green-600 hover:to-teal-600 transition-all duration-300 flex items-center justify-center space-x-2"
-                  >
-                    <Save className="w-5 h-5" />
-                    <span>Save Changes</span>
-                  </motion.button>
-                  <button
-                    onClick={() => setShowEditModal(false)}
-                    className="flex-1 py-3 bg-gray-700 text-gray-300 rounded-lg font-semibold hover:bg-gray-600 transition-colors"
-                  >
-                    Cancel
-                  </button>
+                  {/* Actions */}
+                  <div className="flex space-x-3 mt-6">
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={saveModule}
+                      className="flex-1 py-3 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-xl font-semibold hover:from-purple-600 hover:to-blue-600 transition-all duration-300 flex items-center justify-center space-x-2"
+                    >
+                      <Save className="w-5 h-5" />
+                      <span>{editingModule ? 'Update Module' : 'Create Module'}</span>
+                    </motion.button>
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={closeModal}
+                      className={`px-6 py-3 rounded-xl font-semibold ${
+                        theme === 'dark'
+                          ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      }`}
+                    >
+                      Cancel
+                    </motion.button>
+                  </div>
                 </div>
               </motion.div>
             </motion.div>
