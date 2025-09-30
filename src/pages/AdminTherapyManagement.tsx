@@ -1,12 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Plus, Search, Filter, Edit, Trash2, Eye, Save, X,
-  BookOpen, Brain, Heart, Music, Palette, Gamepad2,
-  Target, Users, Clock, Star, Play, Moon, Zap,
-  Shield, Award, Camera, Video, Headphones, Leaf,
-  Sun, Wind, Waves, Coffee, Smile, Activity, Settings
-} from 'lucide-react';
+import { Plus, Search, Filter, CreditCard as Edit, Trash2, Eye, Save, X, BookOpen, Brain, Heart, Music, Palette, Gamepad2, Target, Users, Clock, Star, Play, Moon, Zap, Shield, Award, Camera, Video, Headphones, Leaf, Sun, Wind, Waves, Coffee, Smile, Activity, Settings } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import toast from 'react-hot-toast';
